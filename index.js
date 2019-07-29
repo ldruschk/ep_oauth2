@@ -44,7 +44,7 @@ function setUsername(token, username) {
 
 exports.expressConfigure = function(hook_name, context) {
   console.log('oauth2-expressConfigure');
-  passport.use('hbp', new OAuth2Strategy({
+  passport.use(new OAuth2Strategy({
     authorizationURL: authorizationURL,
     tokenURL: tokenURL,
     clientID: clientID,
@@ -69,13 +69,7 @@ exports.expressConfigure = function(hook_name, context) {
         accessToken: accessToken,
         refreshToken: refreshToken
       };
-      authorManager.createAuthorIfNotExistsFor(data[idKey], data[usernameKey], function(err, authorId) {
-        if (err) {
-          return cb(err);
-        }
-        data.authorId = authorId;
-        return cb(null, data);
-      });
+      return cb(null, data);
     });
   }));
   var app = context.app;
@@ -86,10 +80,13 @@ exports.expressConfigure = function(hook_name, context) {
 exports.expressCreateServer = function (hook_name, context) {
   console.info('oauth2-expressCreateServer');
   var app = context.app;
-  app.get('/auth/callback', passport.authenticate('hbp', {
+  app.get('/auth/callback', passport.authenticate('oauth2', {
     failureRedirect: '/auth/failure'
-  }), function(req, res) {
-    req.session.user = req.user;
+  }), function(req, res, data) {
+    req.session.user = {
+      username: req.session.passport.user[idKey],
+      displayName: req.session.passport.user[usernameKey],
+    };
     res.redirect(req.session.afterAuthUrl);
   });
   app.get('/auth/failure', function(req, res) {
@@ -104,7 +101,7 @@ exports.authenticate = function(hook_name, context) {
   if (context.req.url.indexOf('/auth/') === 0) return context.next();
   console.info('oauth2-authenticate from ->', context.req.url);
   context.req.session.afterAuthUrl = context.req.url;
-  return passport.authenticate('hbp')(context.req, context.res, context.next);
+  return passport.authenticate('oauth2')(context.req, context.res, context.next);
 }
 
 exports.handleMessage = function(hook_name, context, cb) {
